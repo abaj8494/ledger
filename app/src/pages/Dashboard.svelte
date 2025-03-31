@@ -40,8 +40,8 @@
           {:else}
             {#each accountSummary as account}
               <div class="account-item">
-                <span class="account-name">{account.name}</span>
-                <span class="account-balance">{account.balance}</span>
+                <span class="account-name">{account.account}</span>
+                <span class="account-balance">{account.amount}</span>
               </div>
             {/each}
           {/if}
@@ -59,7 +59,7 @@
               <div class="transaction-item">
                 <div class="transaction-date">{transaction.date}</div>
                 <div class="transaction-payee">{transaction.payee}</div>
-                <div class="transaction-amount">{transaction.amount}</div>
+                <div class="transaction-amount">{transaction.postings && transaction.postings.length > 0 ? transaction.postings[0].amount : ''}</div>
               </div>
             {/each}
           {/if}

@@ -1,5 +1,6 @@
 # Ignore ledger data files
 data/
+.htpasswd/
 
 # Exclude node modules
 app/node_modules/
