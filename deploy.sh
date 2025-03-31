@@ -14,6 +14,9 @@ cd "$PROJECT_ROOT/app"
 npm install
 npm run build
 
+echo "=== Updating reports ==="
+cd "$PROJECT_ROOT"
+./update-reports.sh
 
 # Test OpenResty configuration
 openresty -t
