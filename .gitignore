@@ -1,2 +1,37 @@
+# Ignore ledger data files
 data/
-doc/
+
+# Exclude node modules
+app/node_modules/
+node_modules/
+
+# Build outputs
+app/dist/
+app/cpp_backend/build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.*
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*~

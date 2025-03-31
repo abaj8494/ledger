@@ -1,0 +1,6 @@
+{
+    "port": 3001,
+    "ledger_file": "/var/www/ledger/data/demo.ledger",
+    "ledger_cmd": "ledger",
+    "update_reports_script": "/var/www/ledger/update-reports.sh"
+} 
