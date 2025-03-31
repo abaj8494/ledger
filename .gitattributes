@@ -1,0 +1,49 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# JavaScript and TypeScript files
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.json  text eol=lf
+
+# Svelte files
+*.svelte text eol=lf
+
+# C/C++ files
+*.c     text diff=c
+*.h     text diff=c
+*.cpp   text diff=cpp
+*.hpp   text diff=cpp
+*.cc    text diff=cpp
+
+# Shell scripts
+*.sh    text eol=lf
+
+# Web files
+*.css   text eol=lf
+*.scss  text eol=lf
+*.html  text eol=lf
+*.xml   text eol=lf
+*.svg   text eol=lf
+
+# Documentation
+*.md    text diff=markdown
+*.txt   text
+*.pdf   binary
+
+# Images
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+
+# Ledger files
+*.ledger text
+
+# Don't export these files/directories when people download the repo as a zip file
+.gitattributes export-ignore
+.gitignore     export-ignore
+.vscode        export-ignore 
