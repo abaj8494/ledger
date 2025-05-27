@@ -7,8 +7,8 @@
   let payee = '';
   let isCleared = true;
   let postings = [
-    { account: '', amount: '', comment: '' },
-    { account: '', amount: '', comment: '' }
+    { account: '', amount: '$', comment: '' },
+    { account: '', amount: '$', comment: '' }
   ];
   let accounts = [];
   let isSubmitting = false;
@@ -26,7 +26,7 @@
   });
   
   function addPosting() {
-    postings = [...postings, { account: '', amount: '', comment: '' }];
+    postings = [...postings, { account: '', amount: '$', comment: '' }];
   }
   
   function removePosting(index) {

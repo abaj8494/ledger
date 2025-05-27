@@ -64,10 +64,6 @@
             })) : []
           };
           
-          if (transaction.id === undefined) {
-            console.warn(`Transaction ${index} missing ID, using serverIndex`);
-          }
-          
           return processedTransaction;
         });
         
@@ -174,18 +170,33 @@
     const transaction = transactions[index];
     
     try {
-      const response = await fetch(`/api/transactions/${transaction.id}`, {
+      // The backend uses a reversed index system where it does:
+      // fileIndex = transactions.length - 1 - index
+      // So we need to reverse our index to match what the server expects
+      const totalTransactions = allTransactions.length;
+      const apiIndex = totalTransactions - 1 - transaction.serverIndex;
+      
+      console.log(`Deleting transaction: ${transaction.date} - ${transaction.payee}`);
+      console.log(`Transaction index in UI: ${index}, Server index: ${transaction.serverIndex}, API index: ${apiIndex}, Total transactions: ${totalTransactions}`);
+      
+      const response = await fetch(`/api/transactions/${apiIndex}`, {
         method: 'DELETE'
       });
       
       if (response.ok) {
-        // Remove from both arrays
-        allTransactions = allTransactions.filter(t => t.id !== transaction.id);
+        // Remove from arrays immediately for UI feedback
+        allTransactions = allTransactions.filter(t => t.uniqueId !== transaction.uniqueId);
         transactions = transactions.filter((_, i) => i !== index);
         deleteConfirmIndex = null;
+        
+        console.log('Transaction successfully deleted, reloading from server...');
+        
+        // Reload all transactions to ensure we're in sync with the server
+        setTimeout(loadTransactions, 1000);
       } else {
         const error = await response.json();
         errorMessage = error.message || 'Failed to delete entry';
+        console.error('Server returned error:', error);
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
@@ -369,6 +380,7 @@
   
   .search-bar {
     margin-bottom: 15px;
+    max-width: 100%;
   }
   
   .search-bar input {
@@ -378,6 +390,7 @@
     border-radius: 4px;
     font-size: 1rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
   }
   
   .search-bar input:focus {
