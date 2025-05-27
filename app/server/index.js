@@ -120,9 +120,33 @@ function parseTransaction(content, index) {
   if (currentTransaction) {
     transactions.push(currentTransaction);
   }
+
+  console.log(`Parsed ${transactions.length} transactions from ledger file`);
+
+  // If requesting all transactions, add id field to each transaction
+  if (index === undefined) {
+    // Add IDs to all transactions
+    const result = transactions.map((transaction, idx) => {
+      transaction.id = idx;  // Add ID directly to transaction object
+      return transaction;
+    });
+    
+    // Debug log
+    console.log(`Returning ${result.length} transactions with IDs`);
+    
+    return result;
+  }
   
   // Return the requested transaction or null if index is out of bounds
-  return index !== undefined ? (transactions[index] || null) : transactions;
+  const transaction = transactions[index] || null;
+  if (transaction) {
+    transaction.id = index;  // Add ID to individual transaction
+    console.log(`Returning single transaction with ID ${index}: ${transaction.payee}`);
+  } else {
+    console.log(`Transaction with index ${index} not found in ${transactions.length} transactions`);
+  }
+  
+  return transaction;
 }
 
 // Format a transaction for insertion into the ledger file
@@ -196,6 +220,17 @@ app.get('/api/transactions', (req, res) => {
     const content = parseLedgerFile();
     let transactions = parseTransaction(content);
     
+    // Add explicit index-based IDs before reversing
+    const totalCount = transactions.length;
+    transactions = transactions.map((transaction, idx) => {
+      // Use a stable identifier that won't change with reversal
+      transaction.id = totalCount - 1 - idx;
+      transaction.originalIndex = idx; // For debugging
+      return transaction;
+    });
+    
+    console.log(`Added IDs to ${transactions.length} transactions`);
+    
     // Most recent first
     transactions.reverse();
     
@@ -203,8 +238,17 @@ app.get('/api/transactions', (req, res) => {
       transactions = transactions.slice(0, limit);
     }
     
+    // Verify some IDs in the response
+    if (transactions.length > 0) {
+      console.log(`First transaction: ${transactions[0].payee}, id=${transactions[0].id}, originalIndex=${transactions[0].originalIndex}`);
+      if (transactions.length > 1) {
+        console.log(`Second transaction: ${transactions[1].payee}, id=${transactions[1].id}, originalIndex=${transactions[1].originalIndex}`);
+      }
+    }
+    
     res.json(transactions);
   } catch (error) {
+    console.error(`Error getting transactions: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
@@ -327,19 +371,41 @@ app.get('/api/transactions/:index', (req, res) => {
   try {
     const index = parseInt(req.params.index);
     
+    console.log(`Fetching transaction with index: ${index}`);
+    
     if (isNaN(index)) {
+      console.log('Invalid index format');
       return res.status(400).json({ error: 'Invalid transaction index' });
     }
     
     const content = parseLedgerFile();
-    const transaction = parseTransaction(content, index);
+    const allTransactions = parseTransaction(content);
+    console.log(`Total transactions in file: ${allTransactions.length}`);
+    
+    // Convert UI index to file index - the IDs are reversed
+    const fileIndex = allTransactions.length - 1 - index;
+    console.log(`Converting UI index ${index} to file index ${fileIndex}`);
+    
+    if (fileIndex < 0 || fileIndex >= allTransactions.length) {
+      console.log(`File index ${fileIndex} is out of bounds (max: ${allTransactions.length - 1})`);
+      return res.status(404).json({ error: 'Transaction not found - index out of bounds' });
+    }
+    
+    const transaction = parseTransaction(content, fileIndex);
     
     if (!transaction) {
+      console.log(`Transaction with file index ${fileIndex} not found`);
       return res.status(404).json({ error: 'Transaction not found' });
     }
     
+    // Add the correct ID to match what the UI expects
+    transaction.id = index;
+    
+    console.log(`Found transaction: ${transaction.date} ${transaction.payee}`);
+    
     res.json(transaction);
   } catch (error) {
+    console.error(`Error fetching transaction: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
@@ -382,6 +448,8 @@ app.put('/api/transactions/:index', (req, res) => {
   try {
     const index = parseInt(req.params.index);
     
+    console.log(`Updating transaction with index: ${index}`);
+    
     if (isNaN(index)) {
       return res.status(400).json({ error: 'Invalid transaction index' });
     }
@@ -395,9 +463,16 @@ app.put('/api/transactions/:index', (req, res) => {
     const content = parseLedgerFile();
     const transactions = parseTransaction(content);
     
-    if (index >= transactions.length) {
-      return res.status(404).json({ error: 'Transaction not found' });
+    // Convert UI index to file index - the IDs are reversed
+    const fileIndex = transactions.length - 1 - index;
+    console.log(`Converting UI index ${index} to file index ${fileIndex}`);
+    
+    if (fileIndex < 0 || fileIndex >= transactions.length) {
+      console.log(`File index ${fileIndex} is out of bounds (max: ${transactions.length - 1})`);
+      return res.status(404).json({ error: 'Transaction not found - index out of bounds' });
     }
+    
+    console.log(`Updating transaction #${fileIndex}: ${transactions[fileIndex].payee}`);
     
     // Replace the transaction
     const updatedTransaction = {
@@ -410,8 +485,8 @@ app.put('/api/transactions/:index', (req, res) => {
     const formattedTransaction = formatTransaction(updatedTransaction);
     
     // Find the start and end of the transaction to replace
-    const startLine = transactions[index].startLine;
-    let endLine = index < transactions.length - 1 ? transactions[index + 1].startLine - 1 : null;
+    const startLine = transactions[fileIndex].startLine;
+    let endLine = fileIndex < transactions.length - 1 ? transactions[fileIndex + 1].startLine - 1 : null;
     
     const lines = content.split('\n');
     let newContent;
@@ -449,6 +524,8 @@ app.delete('/api/transactions/:index', (req, res) => {
   try {
     const index = parseInt(req.params.index);
     
+    console.log(`Deleting transaction with index: ${index}`);
+    
     if (isNaN(index)) {
       return res.status(400).json({ error: 'Invalid transaction index' });
     }
@@ -456,13 +533,20 @@ app.delete('/api/transactions/:index', (req, res) => {
     const content = parseLedgerFile();
     const transactions = parseTransaction(content);
     
-    if (index >= transactions.length) {
-      return res.status(404).json({ error: 'Transaction not found' });
+    // Convert UI index to file index - the IDs are reversed
+    const fileIndex = transactions.length - 1 - index;
+    console.log(`Converting UI index ${index} to file index ${fileIndex}`);
+    
+    if (fileIndex < 0 || fileIndex >= transactions.length) {
+      console.log(`File index ${fileIndex} is out of bounds (max: ${transactions.length - 1})`);
+      return res.status(404).json({ error: 'Transaction not found - index out of bounds' });
     }
     
+    console.log(`Deleting transaction #${fileIndex}: ${transactions[fileIndex].payee}`);
+    
     // Find the start and end of the transaction to delete
-    const startLine = transactions[index].startLine;
-    let endLine = index < transactions.length - 1 ? transactions[index + 1].startLine - 1 : null;
+    const startLine = transactions[fileIndex].startLine;
+    let endLine = fileIndex < transactions.length - 1 ? transactions[fileIndex + 1].startLine - 1 : null;
     
     const lines = content.split('\n');
     let newContent;

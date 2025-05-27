@@ -17,16 +17,47 @@
   
   onMount(async () => {
     try {
+      console.log('Edit params:', params);
+      
+      // Validate parameters
+      if (!params.date || !params.payee) {
+        errorMessage = 'Invalid transaction identifier';
+        isLoading = false;
+        return;
+      }
+      
+      // Decode the URL parameters
+      const decodedDate = decodeURIComponent(params.date);
+      const decodedPayee = decodeURIComponent(params.payee);
+      
       // Load accounts for autocomplete
       const accountsResponse = await fetch('/api/accounts');
       if (accountsResponse.ok) {
         accounts = await accountsResponse.json();
       }
       
-      // Load transaction to edit
-      const transactionResponse = await fetch(`/api/transactions/${params.index}`);
-      if (transactionResponse.ok) {
-        transaction = await transactionResponse.json();
+      // Load all transactions to find the one we need to edit
+      const transactionsResponse = await fetch('/api/transactions');
+      if (transactionsResponse.ok) {
+        const allTransactions = await transactionsResponse.json();
+        
+        // Find the transaction that matches our date and payee
+        transaction = allTransactions.find(t => 
+          t.date === decodedDate && 
+          t.payee === decodedPayee
+        );
+        
+        console.log('Loaded transaction for editing:', transaction);
+        
+        if (!transaction) {
+          errorMessage = 'Transaction not found with the given date and payee';
+          isLoading = false;
+          return;
+        }
+        
+        // Store the transaction ID/index for API operations
+        const transactionId = transaction.id !== undefined ? transaction.id : allTransactions.indexOf(transaction);
+        
         date = transaction.date;
         payee = transaction.payee;
         isCleared = !transaction.pending;
@@ -44,8 +75,49 @@
             { account: '', amount: '', comment: '' }
           ];
         }
+        
+        // Update the submit handler to use the found transaction ID
+        handleSubmit = async () => {
+          if (!date || !payee || postings.some(p => !p.account)) {
+            errorMessage = 'Please fill out all required fields';
+            return;
+          }
+          
+          isSubmitting = true;
+          errorMessage = '';
+          console.log(`Submitting update for transaction ${transactionId}`);
+          
+          try {
+            const response = await fetch(`/api/transactions/${transactionId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                date,
+                payee,
+                isCleared,
+                postings
+              })
+            });
+            
+            if (response.ok) {
+              push('/register');
+            } else {
+              const errorData = await response.json();
+              console.error('API error response:', errorData);
+              errorMessage = errorData.error || 'Failed to update entry';
+            }
+          } catch (error) {
+            console.error('Error updating entry:', error);
+            errorMessage = 'Network error occurred';
+          } finally {
+            isSubmitting = false;
+          }
+        };
       } else {
-        errorMessage = 'Failed to load transaction';
+        const errorData = await transactionsResponse.json().catch(() => ({}));
+        errorMessage = errorData.error || `Failed to load transactions (status: ${transactionsResponse.status})`;
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -63,41 +135,9 @@
     postings = postings.filter((_, i) => i !== index);
   }
   
+  // Empty stub for handleSubmit - will be replaced in onMount
   async function handleSubmit() {
-    if (!date || !payee || postings.some(p => !p.account)) {
-      errorMessage = 'Please fill out all required fields';
-      return;
-    }
-    
-    isSubmitting = true;
-    errorMessage = '';
-    
-    try {
-      const response = await fetch(`/api/transactions/${params.index}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          date,
-          payee,
-          isCleared,
-          postings
-        })
-      });
-      
-      if (response.ok) {
-        push('/register');
-      } else {
-        const error = await response.json();
-        errorMessage = error.message || 'Failed to update entry';
-      }
-    } catch (error) {
-      console.error('Error updating entry:', error);
-      errorMessage = 'Network error occurred';
-    } finally {
-      isSubmitting = false;
-    }
+    errorMessage = 'Form submission not properly initialized';
   }
 </script>
 

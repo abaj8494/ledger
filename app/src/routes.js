@@ -13,5 +13,5 @@ export default {
   '/budget': Budget,
   '/cleared': Cleared,
   '/add': AddEntry,
-  '/edit/:index': EditEntry
+  '/edit/:date/:payee': EditEntry
 }; 
