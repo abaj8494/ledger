@@ -11,17 +11,33 @@
     { account: '', amount: '$', comment: '' }
   ];
   let accounts = [];
+  let payees = [];
   let isSubmitting = false;
   let errorMessage = '';
   
   onMount(async () => {
     try {
-      const response = await fetch('/api/accounts');
-      if (response.ok) {
-        accounts = await response.json();
+      const accountsResponse = await fetch('/api/accounts');
+      if (accountsResponse.ok) {
+        accounts = await accountsResponse.json();
+      }
+      
+      const transactionsResponse = await fetch('/api/transactions');
+      if (transactionsResponse.ok) {
+        const transactions = await transactionsResponse.json();
+        
+        const uniquePayees = new Set();
+        transactions.forEach(transaction => {
+          if (transaction.payee) {
+            uniquePayees.add(transaction.payee);
+          }
+        });
+        
+        payees = Array.from(uniquePayees).sort();
+        console.log(`Loaded ${payees.length} payees for autocomplete`);
       }
     } catch (error) {
-      console.error('Error fetching accounts:', error);
+      console.error('Error fetching data:', error);
     }
   });
   
@@ -98,6 +114,7 @@
         bind:value={payee} 
         placeholder="Grocery Store, Rent Payment, etc."
         required
+        list="payees-list"
       />
     </div>
     
@@ -182,6 +199,12 @@
   <datalist id="accounts-list">
     {#each accounts as account}
       <option value={account} />
+    {/each}
+  </datalist>
+  
+  <datalist id="payees-list">
+    {#each payees as existingPayee}
+      <option value={existingPayee} />
     {/each}
   </datalist>
 </div>

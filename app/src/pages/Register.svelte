@@ -11,6 +11,12 @@
   let sortDirection = 'desc'; // Default sort direction (newest first)
   let searchTerm = '';
   
+  // Undo deletion functionality
+  let showUndoBanner = false;
+  let undoTimer = null;
+  let deletedTransaction = null;
+  let deletedIndex = null;
+  
   // Generate a unique identifier for a transaction based on its properties
   function generateUniqueId(transaction) {
     // Combine date, payee and first posting details to create a unique signature
@@ -184,15 +190,31 @@
       });
       
       if (response.ok) {
+        // Store the deleted transaction for possible undo
+        deletedTransaction = { ...transaction };
+        deletedIndex = index;
+        
         // Remove from arrays immediately for UI feedback
         allTransactions = allTransactions.filter(t => t.uniqueId !== transaction.uniqueId);
         transactions = transactions.filter((_, i) => i !== index);
         deleteConfirmIndex = null;
         
-        console.log('Transaction successfully deleted, reloading from server...');
+        // Show the undo banner
+        showUndoBanner = true;
         
-        // Reload all transactions to ensure we're in sync with the server
-        setTimeout(loadTransactions, 1000);
+        // Clear any existing timer
+        if (undoTimer) {
+          clearTimeout(undoTimer);
+        }
+        
+        // Set a timer to hide the banner after 5 seconds
+        undoTimer = setTimeout(() => {
+          showUndoBanner = false;
+          deletedTransaction = null;
+          deletedIndex = null;
+        }, 5000);
+        
+        console.log('Transaction successfully deleted, reloading from server...');
       } else {
         const error = await response.json();
         errorMessage = error.message || 'Failed to delete entry';
@@ -200,6 +222,49 @@
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
+      errorMessage = 'Network error occurred';
+    }
+  }
+  
+  async function undoDelete() {
+    if (!deletedTransaction) return;
+    
+    try {
+      console.log('Undoing deletion of:', deletedTransaction.payee);
+      
+      // Add the transaction back to the server
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          date: deletedTransaction.date,
+          payee: deletedTransaction.payee,
+          isCleared: !deletedTransaction.pending,
+          postings: deletedTransaction.postings
+        })
+      });
+      
+      if (response.ok) {
+        // Clear the undo state
+        showUndoBanner = false;
+        if (undoTimer) {
+          clearTimeout(undoTimer);
+          undoTimer = null;
+        }
+        deletedTransaction = null;
+        deletedIndex = null;
+        
+        // Reload transactions from server
+        await loadTransactions();
+      } else {
+        const error = await response.json();
+        errorMessage = error.message || 'Failed to restore entry';
+        console.error('Server returned error on undo:', error);
+      }
+    } catch (error) {
+      console.error('Error undoing deletion:', error);
       errorMessage = 'Network error occurred';
     }
   }
@@ -224,6 +289,13 @@
   
   {#if errorMessage}
     <div class="error-message">{errorMessage}</div>
+  {/if}
+  
+  {#if showUndoBanner}
+    <div class="undo-banner">
+      <span>Transaction deleted</span>
+      <button on:click={undoDelete}>Undo</button>
+    </div>
   {/if}
   
   {#if isLoading}
@@ -353,10 +425,54 @@
 <style>
   .register-page {
     width: 100%;
+    position: relative;
   }
   
   h1 {
     margin-bottom: 20px;
+  }
+  
+  .undo-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #f9e79f;
+    border: 1px solid #f5d76e;
+    border-radius: 4px;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .undo-banner button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  
+  .undo-banner button:hover {
+    background-color: #2980b9;
+  }
+  
+  @keyframes slideUp {
+    0% {
+      transform: translate(-50%, 100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translate(-50%, 0);
+      opacity: 1;
+    }
   }
   
   .loading, .empty-state, .empty-search {
